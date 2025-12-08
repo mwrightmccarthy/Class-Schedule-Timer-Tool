@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Student Schedule Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body { font-family: sans-serif; padding: 10px; max-width: 600px; margin:auto; }
+    input, select, button { margin: 5px 0; width: 100%; padding: 8px; }
+    h1, h2 { text-align: center; }
+    #result { font-weight: bold; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Student Schedule Tracker</h1>
+
+  <!-- Check Current Class Section -->
+  <h2>Check Current Class</h2>
+  <select id="studentSelect"></select>
+  <button onclick="checkClass()">What class now?</button>
+  <p id="result"></p>
+
+  <!-- Voice Recognition Section -->
+  <h2>Voice Recognition (Optional)</h2>
+  <button onclick="startListening()">🎤 Ask with Voice</button>
+  <p id="voiceText" style="color:gray;"></p>
+
+  <script>
+let students = []; // Holds student schedules
+
+const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSLr_AoBMLw1jumV5JJmULP1OP0Y8b5yzWE5T0GP1KrxT0V-vsEYm4XtehcyOLKosULIRSE14Rj7E0/pubhtml";
+
+// --- Fetch and parse HTML sheet ---
+fetch(sheetURL)
+  .then(res => res.text())
+  .then(htmlText => {
+    // Parse HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlText, "text/html");
+    const table = doc.querySelector("table"); // The main sheet table
+    if(!table) throw new Error("No table found in sheet");
+
+    const rows = Array.from(table.querySelectorAll("tr"));
+    const header = Array.from(rows.shift().querySelectorAll("th,td")).map(c => c.textContent.trim());
+    const days = header.slice(1,6); // Columns B-F = Monday-Friday
+
+    const studentMap = {};
+
+    rows.forEach(row => {
+      const cells = Array.from(row.querySelectorAll("td")).map(c => c.textContent.trim());
+      const timeCell = cells[0];
+      if(!timeCell || !timeCell.includes("-")) return;
+      const [start,end] = timeCell.split("-").map(t=>t.trim());
+      const studentName = cells[6]; // Column G
+      if(!studentName) return;
+
+      for(let i=1;i<=5;i++){
+        const cls = cells[i];
+        if(cls){
+          if(!studentMap[studentName]) studentMap[studentName] = {id: Date.now()+Math.random(), name: studentName, classes: []};
+          studentMap[studentName].classes.push({name: cls, day: days[i-1], start, end});
+        }
+      }
+    });
+
+    students = Object.values(studentMap);
+    renderStudents();
+
+    // Auto-select first student
+    if(students.length>0){
+      document.getElementById("studentSelect").value = students[0].id;
+      checkClass(students[0]);
+    }
+
+  })
+  .catch(err => console.error("Error fetching sheet:", err));
+
+// --- Populate dropdown ---
+function renderStudents(){
+  const sel = document.getElementById("studentSelect");
+  sel.innerHTML = "";
+  students.forEach(s=>{
+    const opt = document.createElement("option");
+    opt.value = s.id; opt.textContent = s.name;
+    sel.appendChild(opt);
+  });
+}
+
+// --- Check current class ---
+function checkClass(studentOverride=null){
+  const student = studentOverride || students.find(s=>s.id==document.getElementById("studentSelect").value);
+  if(!student) return;
+  const now = new Date();
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const today = days[now.getDay()];
+  const timeNow = now.toTimeString().slice(0,5);
+  const current = student.classes.find(c=>c.day===today && c.start<=timeNow && c.end>=timeNow);
+  document.getElementById("result").textContent = current ?
+    `${student.name} is in ${current.name}` :
+    `${student.name} has no class right now.`;
+}
+
+// --- Voice recognition ---
+function startListening(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if(!SpeechRecognition){ alert("Voice recognition not supported"); return; }
+  const recognition = new SpeechRecognition();
+  recognition.lang="en-US"; recognition.start();
+  recognition.onresult = e => {
+    const text = e.results[0][0].transcript.toLowerCase();
+    const student = students.find(s => text.includes(s.name.toLowerCase()));
+    if(!student){ document.getElementById("result").textContent="Student not found"; return; }
+    checkClass(student);
+  }
+}
+  </script>
+</body>
+</html>
