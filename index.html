@@ -25,35 +25,36 @@
   <p id="voiceText" style="color:gray;"></p>
 
   <script>
-let students = []; // Will hold student schedules
+let students = []; // Holds student schedules
 
-const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSLr_AoBMLw1jumV5JJmULP1OP0Y8b5yzWE5T0GP1KrxT0V-vsEYm4XtehcyOLKosULIRSE14Rj7E0/pub?output=csv";
+const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSLr_AoBMLw1jumV5JJmULP1OP0Y8b5yzWE5T0GP1KrxT0V-vsEYm4XtehcyOLKosULIRSE14Rj7E0/pubhtml";
 
-// --- Helper: parse CSV handling quotes ---
-function parseCSV(text){
-  return text.trim().split("\n").map(line => 
-    line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g).map(c => c.replace(/^"|"$/g,'').trim())
-  );
-}
-
-// --- Fetch and process schedule ---
+// --- Fetch and parse HTML sheet ---
 fetch(sheetURL)
   .then(res => res.text())
-  .then(text => {
-    const data = parseCSV(text);
-    const header = data.shift(); // header row
-    const days = header.slice(1,6); // Columns B-F = Monday-Friday
-    const studentMap = {}; // To group classes by student
+  .then(htmlText => {
+    // Parse HTML
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(htmlText, "text/html");
+    const table = doc.querySelector("table"); // The main sheet table
+    if(!table) throw new Error("No table found in sheet");
 
-    data.forEach(row => {
-      const timeCell = row[0]; // Column A
+    const rows = Array.from(table.querySelectorAll("tr"));
+    const header = Array.from(rows.shift().querySelectorAll("th,td")).map(c => c.textContent.trim());
+    const days = header.slice(1,6); // Columns B-F = Monday-Friday
+
+    const studentMap = {};
+
+    rows.forEach(row => {
+      const cells = Array.from(row.querySelectorAll("td")).map(c => c.textContent.trim());
+      const timeCell = cells[0];
       if(!timeCell || !timeCell.includes("-")) return;
       const [start,end] = timeCell.split("-").map(t=>t.trim());
-      const studentName = row[6]; // Column G
+      const studentName = cells[6]; // Column G
       if(!studentName) return;
 
-      for(let i=1; i<=5; i++){ // Columns B-F
-        const cls = row[i];
+      for(let i=1;i<=5;i++){
+        const cls = cells[i];
         if(cls){
           if(!studentMap[studentName]) studentMap[studentName] = {id: Date.now()+Math.random(), name: studentName, classes: []};
           studentMap[studentName].classes.push({name: cls, day: days[i-1], start, end});
@@ -69,14 +70,15 @@ fetch(sheetURL)
       document.getElementById("studentSelect").value = students[0].id;
       checkClass(students[0]);
     }
+
   })
-  .catch(err => console.error(err));
+  .catch(err => console.error("Error fetching sheet:", err));
 
 // --- Populate dropdown ---
 function renderStudents(){
   const sel = document.getElementById("studentSelect");
   sel.innerHTML = "";
-  students.forEach(s => {
+  students.forEach(s=>{
     const opt = document.createElement("option");
     opt.value = s.id; opt.textContent = s.name;
     sel.appendChild(opt);
