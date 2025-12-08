@@ -6,8 +6,6 @@
   <style>
     body { font-family: sans-serif; padding: 10px; max-width: 600px; margin:auto; }
     input, select, button { margin: 5px 0; width: 100%; padding: 8px; }
-    ul { padding-left: 20px; }
-    li { margin: 4px 0; cursor: pointer; }
     h1, h2 { text-align: center; }
     #result { font-weight: bold; margin-top: 10px; }
   </style>
@@ -26,139 +24,92 @@
   <button onclick="startListening()">🎤 Ask with Voice</button>
   <p id="voiceText" style="color:gray;"></p>
 
-  <!-- Add Student Section -->
-  <h2>Add Student</h2>
-  <input id="studentName" placeholder="Student Name">
-  <button onclick="addStudent()">Add Student</button>
+  <script>
+let students = []; // Will hold student schedules
 
-  <!-- Add Class Section -->
-  <h2>Add Class</h2>
-  <input id="className" placeholder="Class Name">
-  <select id="day">
-    <option>Monday</option><option>Tuesday</option>
-    <option>Wednesday</option><option>Thursday</option><option>Friday</option>
-  </select>
-  <input type="time" id="start">
-  <input type="time" id="end">
-  <button onclick="addClass()">Add Class</button>
-
-<script>
-let students = []; // Will hold unpivoted schedule data
-
-// --- Fetch and unpivot Google Sheet ---
 const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vRSLr_AoBMLw1jumV5JJmULP1OP0Y8b5yzWE5T0GP1KrxT0V-vsEYm4XtehcyOLKosULIRSE14Rj7E0/pub?output=csv";
 
+// --- Helper: parse CSV handling quotes ---
+function parseCSV(text){
+  return text.trim().split("\n").map(line => 
+    line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g).map(c => c.replace(/^"|"$/g,'').trim())
+  );
+}
+
+// --- Fetch and process schedule ---
 fetch(sheetURL)
-  .then(response => response.text())
-  .then(csvText => {
-    const lines = csvText.trim().split("\n");
-    const header = lines.shift().split(",");
-    const days = header.slice(1,6); // Monday-Friday columns
-    const result = [];
+  .then(res => res.text())
+  .then(text => {
+    const data = parseCSV(text);
+    const header = data.shift(); // header row
+    const days = header.slice(1,6); // Columns B-F = Monday-Friday
+    const studentMap = {}; // To group classes by student
 
-    lines.forEach(line => {
-      const cells = line.split(",");
-      const time = cells[0].split("-");
-      const start = time[0].trim();
-      const end = time[1].trim();
-      const studentName = cells[6]; // Column G = Student Name
+    data.forEach(row => {
+      const timeCell = row[0]; // Column A
+      if(!timeCell || !timeCell.includes("-")) return;
+      const [start,end] = timeCell.split("-").map(t=>t.trim());
+      const studentName = row[6]; // Column G
+      if(!studentName) return;
 
-      for (let i = 1; i <= 5; i++) { // Columns B-F = Monday-Friday
-        const cls = cells[i].trim();
-        if(cls) {
-          result.push({
-            id: Date.now()+Math.random(),
-            name: studentName,
-            classes: [{
-              name: cls,
-              day: days[i-1],
-              start: start,
-              end: end
-            }]
-          });
+      for(let i=1; i<=5; i++){ // Columns B-F
+        const cls = row[i];
+        if(cls){
+          if(!studentMap[studentName]) studentMap[studentName] = {id: Date.now()+Math.random(), name: studentName, classes: []};
+          studentMap[studentName].classes.push({name: cls, day: days[i-1], start, end});
         }
       }
     });
 
-    // Merge classes for the same student
-    const studentMap = {};
-    result.forEach(s=>{
-      if(!studentMap[s.name]) studentMap[s.name] = {id: s.id, name: s.name, classes: []};
-      studentMap[s.name].classes.push(...s.classes);
-    });
     students = Object.values(studentMap);
-
     renderStudents();
+
+    // Auto-select first student
+    if(students.length>0){
+      document.getElementById("studentSelect").value = students[0].id;
+      checkClass(students[0]);
+    }
   })
-  .catch(err => console.error("Error fetching Google Sheet:", err));
+  .catch(err => console.error(err));
 
-// --- Helper Functions ---
-function save() { localStorage.setItem("students", JSON.stringify(students)); }
-
-function renderStudents() {
+// --- Populate dropdown ---
+function renderStudents(){
   const sel = document.getElementById("studentSelect");
   sel.innerHTML = "";
-  students.forEach(s=>{
-    const opt=document.createElement("option");
-    opt.value=s.id; opt.textContent=s.name;
+  students.forEach(s => {
+    const opt = document.createElement("option");
+    opt.value = s.id; opt.textContent = s.name;
     sel.appendChild(opt);
   });
 }
 
-function addStudent() {
-  const name = document.getElementById("studentName").value.trim();
-  if(!name) return alert("Enter a student name");
-  students.push({id: Date.now(), name, classes: []});
-  save(); renderStudents();
-  document.getElementById("studentName").value = "";
-}
-
-function addClass() {
-  const id=Number(document.getElementById("studentSelect").value);
-  const student = students.find(s=>s.id===id);
-  if(!student) return alert("Select a student");
-  const cname=document.getElementById("className").value.trim();
-  if(!cname) return alert("Enter class name");
-  student.classes.push({
-    name:cname,
-    day:document.getElementById("day").value,
-    start:document.getElementById("start").value,
-    end:document.getElementById("end").value
-  });
-  save();
-  alert("Class added");
-  document.getElementById("className").value = "";
-  document.getElementById("start").value = "";
-  document.getElementById("end").value = "";
-}
-
+// --- Check current class ---
 function checkClass(studentOverride=null){
   const student = studentOverride || students.find(s=>s.id==document.getElementById("studentSelect").value);
-  if(!student) return alert("Select a student");
-  const now=new Date();
-  const days=["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
-  const today=days[now.getDay()];
-  const timeNow=now.toTimeString().slice(0,5);
-  const current=student.classes.find(c=>c.day===today && c.start<=timeNow && c.end>=timeNow);
-  document.getElementById("result").textContent=current?
-    `${student.name} is in ${current.name}`:
+  if(!student) return;
+  const now = new Date();
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const today = days[now.getDay()];
+  const timeNow = now.toTimeString().slice(0,5);
+  const current = student.classes.find(c=>c.day===today && c.start<=timeNow && c.end>=timeNow);
+  document.getElementById("result").textContent = current ?
+    `${student.name} is in ${current.name}` :
     `${student.name} has no class right now.`;
 }
 
-// --- Voice Recognition ---
+// --- Voice recognition ---
 function startListening(){
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if(!SpeechRecognition){ alert("Voice recognition not supported"); return; }
   const recognition = new SpeechRecognition();
   recognition.lang="en-US"; recognition.start();
-  recognition.onresult = e=>{
-    const text=e.results[0][0].transcript.toLowerCase();
-    document.getElementById("voiceText").textContent="Heard: "+text;
-    const student=students.find(s=>text.includes(s.name.toLowerCase()));
+  recognition.onresult = e => {
+    const text = e.results[0][0].transcript.toLowerCase();
+    const student = students.find(s => text.includes(s.name.toLowerCase()));
     if(!student){ document.getElementById("result").textContent="Student not found"; return; }
     checkClass(student);
   }
 }
-</script>
+  </script>
 </body>
 </html>
