@@ -9,7 +9,6 @@
 :root{
   --bg:#f6f8fb;
   --card:#ffffff;
-  --text:#111827;
 }
 
 body{
@@ -51,10 +50,6 @@ button{
   cursor:pointer;
 }
 
-.timer{
-  margin-top:20px;
-}
-
 .bar-frame{
   position:relative;
   height:42px;
@@ -63,21 +58,12 @@ button{
   overflow:hidden;
 }
 
-/* base */
-.bar-base{
-  position:absolute;
-  inset:0;
-  z-index:1;
-}
-
-/* agenda layer */
 .agenda-layer{
   position:absolute;
   inset:0;
   z-index:2;
 }
 
-/* elapsed overlay */
 .progress{
   position:absolute;
   inset:0;
@@ -87,7 +73,6 @@ button{
   pointer-events:none;
 }
 
-/* text layer */
 .bar-text{
   position:absolute;
   inset:0;
@@ -135,28 +120,25 @@ button{
   <button onclick="init()">Start Timer</button>
 </div>
 
-<div class="timer">
-  <div class="bar-frame" id="bar">
-    <div class="bar-base"></div>
-    <div class="agenda-layer" id="agendaLayer"></div>
-    <div class="progress" id="progress"></div>
-    <div class="bar-text">
-      <div id="elapsedText">0%</div>
-      <div id="remainText">100%</div>
-    </div>
+<div class="bar-frame" id="bar">
+  <div class="agenda-layer" id="agendaLayer"></div>
+  <div class="progress" id="progress"></div>
+  <div class="bar-text">
+    <div id="elapsedText">0%</div>
+    <div id="remainText">100%</div>
   </div>
+</div>
 
-  <div class="mins">
-    <div id="gone">0 min elapsed</div>
-    <div id="left">0 min remaining</div>
-  </div>
+<div class="mins">
+  <div id="gone">0 min elapsed</div>
+  <div id="left">0 min remaining</div>
+</div>
 
-  <div class="controls" style="margin-top:12px">
-    <input id="label" placeholder="Agenda name">
-    <input id="minutes" type="number" placeholder="Minutes">
-    <input id="color" type="color" value="#f97316">
-    <button onclick="addAgenda()">Add Agenda</button>
-  </div>
+<div class="controls" style="margin-top:12px">
+  <input id="label" placeholder="Agenda name">
+  <input id="minutes" type="number" placeholder="Minutes">
+  <input id="color" type="color" value="#f97316">
+  <button onclick="addAgenda()">Add Agenda</button>
 </div>
 
 </div>
@@ -165,8 +147,12 @@ button{
 <script>
 let startMin,endMin,total;
 let agendas=[];
+const bar=document.getElementById('bar');
 
-function toMin(t){const[h,m]=t.split(':').map(Number);return h*60+m}
+function toMin(t){
+  const[h,m]=t.split(':').map(Number);
+  return h*60+m;
+}
 
 function init(){
   startMin=toMin(start.value);
@@ -177,13 +163,20 @@ function init(){
 }
 
 function addAgenda(){
+  const labelVal=document.getElementById('label').value.trim();
+  const minVal=Number(document.getElementById('minutes').value);
+  const colorVal=document.getElementById('color').value;
+
+  if(!labelVal||!minVal) return;
+
   agendas.push({
     id:crypto.randomUUID(),
-    label,
-    minutes:+minutes.value,
-    color:color.value,
-    offset:agendas.reduce((a,b)=>a+b.minutes,0)
+    label:labelVal,
+    minutes:minVal,
+    color:colorVal,
+    offset:agendas.reduce((s,a)=>s+a.minutes,0)
   });
+
   renderAgenda();
 }
 
@@ -192,10 +185,10 @@ function renderAgenda(){
   agendas.forEach(a=>{
     const el=document.createElement('div');
     el.className='agenda-item';
+    el.textContent=`${a.label} ${a.minutes}m`;
     el.style.background=a.color;
     el.style.width=(a.minutes/total*100)+'%';
     el.style.left=(a.offset/total*100)+'%';
-    el.textContent=a.label+' '+a.minutes+'m';
     makeDraggable(el,a);
     agendaLayer.appendChild(el);
   });
@@ -207,20 +200,24 @@ function makeDraggable(el,a){
     startX=e.clientX;
     startOffset=a.offset;
     el.setPointerCapture(e.pointerId);
+
     document.onpointermove=ev=>{
       const dx=ev.clientX-startX;
       const minPerPx=total/bar.offsetWidth;
-      let mins=Math.round((startOffset+dx*minPerPx));
+      let mins=Math.round(startOffset+dx*minPerPx);
       mins=Math.max(0,Math.min(total-a.minutes,mins));
       a.offset=mins;
-      snapAndSort();
+      snap();
       renderAgenda();
     };
-    document.onpointerup=()=>document.onpointermove=null;
-  }
+
+    document.onpointerup=()=>{
+      document.onpointermove=null;
+    };
+  };
 }
 
-function snapAndSort(){
+function snap(){
   agendas.sort((a,b)=>a.offset-b.offset);
   let cursor=0;
   agendas.forEach(a=>{
@@ -230,6 +227,7 @@ function snapAndSort(){
 }
 
 function update(){
+  if(!total) return;
   const now=new Date();
   const nowMin=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
   const elapsed=Math.min(total,Math.max(0,nowMin-startMin));
