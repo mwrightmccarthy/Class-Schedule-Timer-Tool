@@ -1,222 +1,245 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>Linear Classroom Timer</title>
 
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #f6f8fb;
-    padding: 20px;
-  }
-  .card {
-    background: white;
-    padding: 16px;
-    border-radius: 10px;
-    max-width: 900px;
-    margin: auto;
-    box-shadow: 0 8px 24px rgba(0,0,0,.08);
-  }
-  .controls, .agenda-controls {
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    margin-bottom: 12px;
-  }
-  input, button {
-    padding: 8px;
-    border-radius: 8px;
-    border: 1px solid #ccc;
-  }
-  input[type="color"] {
-    padding: 0;
-    width: 44px;
-    height: 36px;
-  }
-  button {
-    background: #2563eb;
-    color: white;
-    border: none;
-    cursor: pointer;
-  }
+body{
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;
+  background:#f6f8fb;
+  margin:0;
+  padding:20px;
+}
+.card{
+  max-width:1100px;
+  margin:auto;
+  background:#fff;
+  border-radius:14px;
+  padding:16px;
+  box-shadow:0 10px 30px rgba(0,0,0,.08);
+}
+.controls,input,button{
+  font-size:14px;
+}
+.controls{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-bottom:16px;
+}
+input,button{
+  padding:8px 10px;
+  border-radius:8px;
+  border:1px solid #ddd;
+}
+button{
+  background:#2563eb;
+  color:#fff;
+  border:none;
+  cursor:pointer;
+}
+.timer{
+  margin-top:20px;
+}
+.bar-wrapper{
+  position:relative;
+  margin-top:16px;
+}
+.bar{
+  position:relative;
+  height:42px;
+  background:#e5e7eb;
+  border-radius:12px;
+  overflow:hidden;
+}
+.progress{
+  position:absolute;
+  left:0;
+  top:0;
+  height:100%;
+  background:#2563eb;
+  width:0%;
+  transition:width .4s linear;
+}
+.start-label,.end-label{
+  position:absolute;
+  top:-24px;
+  font-size:13px;
+  font-weight:700;
+  color:#fff;
+  text-shadow:
+    -1px -1px 0 #000,
+     1px -1px 0 #000,
+    -1px  1px 0 #000,
+     1px  1px 0 #000;
+}
+.start-label{ left:0; }
+.end-label{ right:0; }
 
-  .timer {
-    margin-top: 20px;
-  }
+.agenda-bar{
+  position:absolute;
+  top:0;
+  height:100%;
+  display:flex;
+}
+.agenda-item{
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:700;
+  color:#fff;
+  white-space:nowrap;
+  border-right:1px solid rgba(255,255,255,.4);
+}
 
-  .bar-frame {
-    background: #e5e7eb;
-    border-radius: 10px;
-    padding: 10px;
-    position: relative;
-  }
-
-  .bar {
-    height: 36px;
-    background: #d1d5db;
-    border-radius: 8px;
-    position: relative;
-    overflow: visible;
-  }
-
-  .bar-fill {
-    height: 100%;
-    background: #3b82f6;
-    width: 0%;
-    border-radius: 8px;
-  }
-
-  .time-label {
-    position: absolute;
-    top: 50%;
-    transform: translateY(-50%);
-    color: white;
-    font-weight: bold;
-    text-shadow:
-      -1px -1px 0 #000,
-       1px -1px 0 #000,
-      -1px  1px 0 #000,
-       1px  1px 0 #000;
-    pointer-events: none;
-  }
-  .time-start { left: 8px; }
-  .time-end { right: 8px; }
-
-  .agenda-item {
-    position: absolute;
-    top: -30px;
-    padding: 6px 8px;
-    border-radius: 6px;
-    color: white;
-    font-size: 13px;
-    white-space: nowrap;
-  }
+.info{
+  margin-top:8px;
+  display:flex;
+  justify-content:space-between;
+  font-weight:700;
+}
+.now{
+  margin-top:12px;
+  font-size:18px;
+  font-weight:800;
+}
+.agenda-inputs{
+  margin-top:16px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
 </style>
 </head>
 
 <body>
-
 <div class="card">
-  <h2>Linear Timer</h2>
+  <h2>Linear Classroom Timer</h2>
 
   <div class="controls">
-    <input id="timerName" placeholder="Timer name">
-    <input id="startTime" type="time">
-    <input id="endTime" type="time">
-    <button onclick="addTimer()">Add Timer</button>
+    <input id="name" placeholder="Timer name">
+    <input id="start" type="time">
+    <input id="end" type="time">
+    <button onclick="createTimer()">Create Timer</button>
   </div>
 
-  <div id="timers"></div>
+  <div id="app"></div>
 </div>
 
 <script>
-function toMinutes(t) {
-  const [h, m] = t.split(':').map(Number);
-  return h * 60 + m;
-}
-function format(t) {
-  let [h, m] = t.split(':').map(Number);
-  const ap = h < 12 ? 'AM' : 'PM';
-  h = ((h + 11) % 12) + 1;
-  return `${h}:${String(m).padStart(2, '0')} ${ap}`;
+let timer=null;
+
+function minutes(t){
+  const [h,m]=t.split(':').map(Number);
+  return h*60+m;
 }
 
-const timers = [];
+function createTimer(){
+  const name=document.getElementById('name').value;
+  const start=document.getElementById('start').value;
+  const end=document.getElementById('end').value;
+  if(!name||!start||!end) return alert('Fill all fields');
 
-function addTimer() {
-  const name = timerName.value || 'Timer';
-  const start = startTime.value;
-  const end = endTime.value;
-  if (!start || !end) return alert('Enter start and end times');
-
-  timers.push({
-    id: Math.random(),
+  timer={
     name,
     start,
     end,
-    s: toMinutes(start),
-    e: toMinutes(end),
-    agenda: []
-  });
+    s:minutes(start),
+    e:minutes(end),
+    agenda:[]
+  };
   render();
 }
 
-function addAgenda(timerId) {
-  const t = timers.find(x => x.id === timerId);
-  const label = document.getElementById(`label-${timerId}`).value;
-  const mins = Number(document.getElementById(`mins-${timerId}`).value);
-  const color = document.getElementById(`color-${timerId}`).value;
-  if (!label || !mins) return;
+function addAgenda(){
+  const label=document.getElementById('aLabel').value;
+  const mins=Number(document.getElementById('aMins').value);
+  const color=document.getElementById('aColor').value;
+  if(!label||!mins) return;
 
-  t.agenda.push({ label, mins, color });
+  timer.agenda.push({label,mins,color});
+  document.getElementById('aLabel').value='';
+  document.getElementById('aMins').value='';
   render();
 }
 
-function render() {
-  timersDiv.innerHTML = '';
+function render(){
+  const dur=timer.e-timer.s;
+  let html=`
+  <div class="timer">
+    <h3>${timer.name}</h3>
 
-  timers.forEach(t => {
-    const duration = t.e - t.s;
-    const el = document.createElement('div');
-    el.className = 'timer';
+    <div class="bar-wrapper">
+      <div class="start-label">${timer.start}</div>
+      <div class="end-label">${timer.end}</div>
 
-    el.innerHTML = `
-      <h3>${t.name}</h3>
-
-      <div class="agenda-controls">
-        <input id="label-${t.id}" placeholder="Agenda item">
-        <input id="mins-${t.id}" type="number" placeholder="Minutes" style="width:90px">
-        <input id="color-${t.id}" type="color" value="#f97316">
-        <button onclick="addAgenda(${t.id})">Add Agenda</button>
+      <div class="bar">
+        <div class="agenda-bar" id="agenda"></div>
+        <div class="progress" id="progress"></div>
       </div>
+    </div>
 
-      <div class="bar-frame">
-        <div class="bar" id="bar-${t.id}">
-          <div class="bar-fill" id="fill-${t.id}"></div>
-          <div class="time-label time-start">${format(t.start)}</div>
-          <div class="time-label time-end">${format(t.end)}</div>
-        </div>
-      </div>
-    `;
+    <div class="info">
+      <div id="elapsed">0 min (0%)</div>
+      <div id="remaining">${dur} min left</div>
+    </div>
 
-    timersDiv.appendChild(el);
+    <div class="now" id="now">Now happening: —</div>
 
-    const bar = el.querySelector('.bar');
+    <div class="agenda-inputs">
+      <input id="aLabel" placeholder="Agenda item">
+      <input id="aMins" type="number" placeholder="Minutes">
+      <input id="aColor" type="color" value="#16a34a">
+      <button onclick="addAgenda()">Add Agenda</button>
+    </div>
+  </div>
+  `;
+  document.getElementById('app').innerHTML=html;
 
-    t.agenda.forEach(a => {
-      const w = (a.mins / duration) * 100;
-      const item = document.createElement('div');
-      item.className = 'agenda-item';
-      item.style.width = w + '%';
-      item.style.left = '0%';
-      item.style.background = a.color;
-      item.textContent = `${a.label} (${a.mins}m)`;
-      bar.appendChild(item);
-    });
+  const agendaBar=document.getElementById('agenda');
+  let used=0;
+  timer.agenda.forEach(a=>{
+    const w=(a.mins/dur)*100;
+    const div=document.createElement('div');
+    div.className='agenda-item';
+    div.style.width=w+'%';
+    div.style.background=a.color;
+    div.textContent=a.label;
+    agendaBar.appendChild(div);
+    used+=a.mins;
   });
+
+  update();
 }
 
-function update() {
-  const now = new Date();
-  const nowMin = now.getHours() * 60 + now.getMinutes() + now.getSeconds() / 60;
+function update(){
+  if(!timer) return;
+  const now=new Date();
+  const nowMin=now.getHours()*60+now.getMinutes();
+  const dur=timer.e-timer.s;
+  let elapsed=Math.max(0,Math.min(dur,nowMin-timer.s));
+  const pct=(elapsed/dur)*100;
 
-  timers.forEach(t => {
-    const duration = t.e - t.s;
-    let elapsed = nowMin - t.s;
-    if (elapsed < 0) elapsed = 0;
-    if (elapsed > duration) elapsed = duration;
-    const pct = (elapsed / duration) * 100;
+  document.getElementById('progress').style.width=pct+'%';
+  document.getElementById('elapsed').textContent=
+    `${elapsed} min (${pct.toFixed(1)}%)`;
+  document.getElementById('remaining').textContent=
+    `${dur-elapsed} min left`;
 
-    const fill = document.getElementById(`fill-${t.id}`);
-    if (fill) fill.style.width = pct + '%';
-  });
+  let acc=0, current='—';
+  for(const a of timer.agenda){
+    acc+=a.mins;
+    if(elapsed<=acc){ current=a.label; break; }
+  }
+  document.getElementById('now').textContent=
+    `Now happening: ${current}`;
 }
 
-setInterval(update, 1000);
-const timersDiv = document.getElementById('timers');
+setInterval(update,1000);
 </script>
-
 </body>
 </html>
