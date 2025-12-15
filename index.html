@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
+<meta charset="UTF-8">
 <title>Linear Agenda Timer</title>
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
 body {
@@ -32,7 +32,7 @@ h1 {
 
 input, button {
   padding: 10px;
-  border-radius: 12px;
+  border-radius: 14px;
   border: none;
   font-size: 14px;
 }
@@ -45,54 +45,71 @@ button {
 
 .timer-shell {
   background: #1e293b;
-  border-radius: 20px;
-  padding: 14px;
+  border-radius: 22px;
+  padding: 16px;
   margin-top: 20px;
 }
 
 .time-labels {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
-  margin-bottom: 6px;
-  opacity: 0.9;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e5e7eb;
+  margin-bottom: 8px;
 }
 
 .timer-bar {
   position: relative;
-  height: 44px;
-  background: white;
-  border-radius: 16px;
+  height: 46px;
+  background: #e5e7eb;
+  border-radius: 18px;
   overflow: hidden;
 }
 
+/* Progress overlay */
+.progress-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: linear-gradient(90deg, #3b82f6, #60a5fa);
+  width: 0%;
+  z-index: 1;
+  transition: width 0.5s linear;
+}
+
+/* Agenda blocks */
 .agenda {
   position: absolute;
   top: 0;
   height: 100%;
-  border-radius: 14px;
+  border-radius: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 12px;
   font-weight: 600;
   white-space: nowrap;
+  z-index: 2;
+  pointer-events: none;
 }
 
 #elapsedBox {
-  margin-top: 14px;
-  padding: 14px;
+  margin-top: 16px;
+  padding: 16px;
   background: #020617;
-  border-radius: 16px;
+  border-radius: 18px;
   text-align: center;
-  font-size: 15px;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 #nowBox {
   margin-top: 12px;
   padding: 16px;
   background: #020617;
-  border-radius: 16px;
+  border-radius: 18px;
   font-size: 18px;
   text-align: center;
 }
@@ -110,8 +127,8 @@ button {
 </div>
 
 <div class="controls">
-  <input id="agendaName" placeholder="Agenda item name" />
-  <input id="agendaMinutes" type="number" placeholder="Minutes" />
+  <input id="agendaName" placeholder="Agenda item name">
+  <input id="agendaMinutes" type="number" placeholder="Minutes">
   <label>Bar <input type="color" id="agendaColor" value="#22c55e"></label>
   <label>Text <input type="color" id="textColor" value="#ffffff"></label>
   <button onclick="addAgenda()">Add Agenda</button>
@@ -123,20 +140,24 @@ button {
     <span id="endLabel">End</span>
   </div>
 
-  <div class="timer-bar" id="timerBar"></div>
+  <div class="timer-bar" id="timerBar">
+    <div class="progress-fill" id="progressFill"></div>
+  </div>
 </div>
 
 <div id="elapsedBox">
   Elapsed — 0 min (0%) • Remaining — 0 min
 </div>
 
-<div id="nowBox">Now Happening —</div>
+<div id="nowBox">
+  Now Happening —
+</div>
 
 </div>
 
 <script>
 let agendas = [];
-let totalMinutes = 60;
+let totalMinutes = 0;
 
 function minutesBetween(a, b) {
   return (b - a) / 60000;
@@ -144,11 +165,15 @@ function minutesBetween(a, b) {
 
 function updateTotalTime() {
   if (!startTime.value || !endTime.value) return;
+
   const s = new Date("1970-01-01T" + startTime.value);
   const e = new Date("1970-01-01T" + endTime.value);
   totalMinutes = minutesBetween(s, e);
+
   startLabel.textContent = startTime.value;
   endLabel.textContent = endTime.value;
+
+  renderAgenda();
 }
 
 startTime.onchange = updateTotalTime;
@@ -157,7 +182,7 @@ endTime.onchange = updateTotalTime;
 function addAgenda() {
   const name = agendaName.value;
   const mins = parseInt(agendaMinutes.value);
-  if (!name || !mins || mins <= 0) return;
+  if (!name || !mins || mins <= 0 || !totalMinutes) return;
 
   agendas.push({
     name,
@@ -172,9 +197,9 @@ function addAgenda() {
 }
 
 function renderAgenda() {
-  timerBar.innerHTML = "";
-  let offset = 0;
+  timerBar.querySelectorAll(".agenda").forEach(e => e.remove());
 
+  let offset = 0;
   agendas.forEach(item => {
     const width = (item.mins / totalMinutes) * 100;
 
@@ -192,7 +217,7 @@ function renderAgenda() {
 }
 
 function updateDisplays() {
-  if (!startTime.value || !endTime.value) return;
+  if (!startTime.value || !endTime.value || !totalMinutes) return;
 
   const now = new Date();
   const start = new Date("1970-01-01T" + startTime.value);
@@ -205,6 +230,8 @@ function updateDisplays() {
   elapsedBox.textContent =
     `Elapsed — ${Math.floor(elapsed)} min (${percent.toFixed(1)}%) • Remaining — ${Math.ceil(remaining)} min`;
 
+  progressFill.style.width = percent + "%";
+
   let sum = 0;
   let current = "—";
   for (const item of agendas) {
@@ -214,6 +241,7 @@ function updateDisplays() {
       break;
     }
   }
+
   nowBox.textContent = "Now Happening — " + current;
 }
 
