@@ -13,10 +13,10 @@
   input,button{padding:8px;border-radius:8px;border:1px solid #ddd}
   button{background:#0b66ff;color:#fff;border:0;cursor:pointer}
 
-  .timer{margin-top:18px}
-  .bar-frame{background:#eef2f7;border-radius:10px;padding:10px;position:relative}
+  .timer{margin-top:20px}
+  .bar-frame{background:#eef2f7;border-radius:10px;padding:10px}
   .bar{height:36px;background:#ddd;border-radius:8px;position:relative;overflow:visible}
-  .bar-fill{position:absolute;left:0;top:0;height:100%;border-radius:8px}
+  .bar-fill{position:absolute;left:0;top:0;height:100%;background:#3b82f6;border-radius:8px}
 
   /* START / END LABELS */
   .time-label{
@@ -32,19 +32,22 @@
        1px -1px 0 #000,
       -1px  1px 0 #000,
        1px  1px 0 #000;
+    z-index:5;
   }
   .time-start{left:8px}
   .time-end{right:8px}
 
+  /* AGENDA */
   .agenda-item{
     position:absolute;
-    top:-30px;
+    top:-32px;
     padding:6px 8px;
     border-radius:6px;
     color:#fff;
     font-size:13px;
     white-space:nowrap;
     cursor:grab;
+    z-index:10;
   }
 </style>
 </head>
@@ -75,16 +78,17 @@ function fmt(t){
 const timers=[]
 
 function addTimer(){
-  const t={
+  timers.push({
     id:Math.random(),
-    name:name.value,
+    name:name.value || 'Timer',
     start:start.value,
     end:end.value,
     s:toMin(start.value),
     e:toMin(end.value),
-    agenda:[]
-  }
-  timers.push(t)
+    agenda:[
+      {label:'Example', dur:10, color:'#f97316', offset:0}
+    ]
+  })
   render()
 }
 
@@ -97,8 +101,8 @@ function render(){
     el.innerHTML=`
       <b>${t.name}</b><br><br>
       <div class="bar-frame">
-        <div class="bar">
-          <div class="bar-fill" style="background:#3b82f6"></div>
+        <div class="bar" id="bar-${t.id}">
+          <div class="bar-fill" id="fill-${t.id}"></div>
 
           <!-- START / END LABELS -->
           <div class="time-label time-start">${fmt(t.start)}</div>
@@ -107,8 +111,36 @@ function render(){
       </div>
     `
     timersDiv.appendChild(el)
+
+    // agenda items
+    const bar=el.querySelector('.bar')
+    t.agenda.forEach(a=>{
+      const w=(a.dur/dur)*100
+      const item=document.createElement('div')
+      item.className='agenda-item'
+      item.style.width=`${w}%`
+      item.style.left=`${a.offset}%`
+      item.style.background=a.color
+      item.textContent=`${a.label} (${a.dur}m)`
+      bar.appendChild(item)
+    })
   })
 }
+
+function update(){
+  const now=new Date()
+  const nowMin=now.getHours()*60+now.getMinutes()+now.getSeconds()/60
+  timers.forEach(t=>{
+    const dur=t.e-t.s
+    let since=(nowMin-t.s+1440)%1440
+    if(since>dur) since=dur
+    const pct=(since/dur)*100
+    const fill=document.getElementById(`fill-${t.id}`)
+    if(fill) fill.style.width=pct+'%'
+  })
+}
+
+setInterval(update,1000)
 
 const timersDiv=document.getElementById('timers')
 </script>
