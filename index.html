@@ -1,122 +1,188 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
-<title>Linear Classroom Timer</title>
+<meta charset="UTF-8">
+<title>Linear Timer – Agenda Snap Test</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-  :root{--bg:#f6f8fb;--card:#fff;--muted:#6b7a90;}
-  body{font-family:Inter,system-ui;margin:0;padding:20px;background:var(--bg);display:flex;justify-content:center;}
-  .wrap{width:100%;max-width:1100px;}
-  h1{text-align:center;font-size:20px}
-  .card{background:#fff;padding:14px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.06);}
-  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
-  input,button{padding:8px;border-radius:8px;border:1px solid #e6eef8;font-size:14px}
-  input[type="color"]{padding:0;width:44px;height:36px}
-  button{background:#0b66ff;color:#fff;border:0;cursor:pointer}
-  .timer{margin-top:16px;padding:12px;border-radius:12px;background:#fff;box-shadow:0 6px 18px rgba(0,0,0,.04)}
-  .timer-head{display:flex;justify-content:space-between;align-items:center}
-  .meta{color:var(--muted);font-size:13px}
-  .bar-frame{margin-top:16px;background:#eef2f7;border-radius:12px;padding:10px}
-  .bar{position:relative;height:36px;border-radius:10px;background:#f5f7fb;overflow:hidden}
-  .bar-fill{position:absolute;left:0;top:0;height:100%;width:0;border-radius:10px}
-  .bar-labels{display:flex;justify-content:space-between;font-size:13px;margin-top:6px;font-weight:600}
-  .elapsed{text-align:center;font-weight:700;margin-top:6px}
+  body {
+    font-family: Arial, sans-serif;
+    background: #f5f7fb;
+    padding: 20px;
+  }
+
+  .timer {
+    background: white;
+    padding: 16px;
+    border-radius: 10px;
+    max-width: 900px;
+    margin-bottom: 20px;
+    box-shadow: 0 6px 18px rgba(0,0,0,.08);
+  }
+
+  .bar-frame {
+    position: relative;
+    height: 40px;
+    background: #e5e9f0;
+    border-radius: 10px;
+    margin-top: 16px;
+  }
+
+  .bar {
+    position: relative;
+    height: 100%;
+    border-radius: 10px;
+  }
+
+  .agenda {
+    position: absolute;
+    top: -34px;
+    height: 28px;
+    border-radius: 6px;
+    background: #ef4444;
+    color: white;
+    font-size: 13px;
+    padding: 4px 8px;
+    cursor: grab;
+    user-select: none;
+    white-space: nowrap;
+  }
+
+  input, button {
+    padding: 6px 8px;
+    margin-right: 6px;
+    border-radius: 6px;
+    border: 1px solid #ccc;
+  }
+
+  button {
+    background: #2563eb;
+    color: white;
+    border: none;
+    cursor: pointer;
+  }
 </style>
 </head>
 
 <body>
-<div class="wrap">
-<h1>Linear Classroom Timer</h1>
 
-<div class="card">
-  <div class="controls">
-    <input id="name" placeholder="Timer name">
-    <input id="start" type="time">
-    <input id="end" type="time">
-    <input id="color" type="color" value="#3b82f6">
-    <button onclick="addTimer()">Add Timer</button>
-  </div>
+<h2>Linear Timer (Agenda Snap Test)</h2>
 
-  <div id="timers"></div>
+<div>
+  <input id="timerName" placeholder="Timer name">
+  <input id="startTime" type="time">
+  <input id="endTime" type="time">
+  <button onclick="addTimer()">Add Timer</button>
 </div>
-</div>
+
+<div id="timers"></div>
 
 <script>
-function toMin(t){const [h,m]=t.split(':').map(Number);return h*60+m;}
-function fmt(t){let h=Math.floor(t/60),m=t%60;const ap=h<12?'AM':'PM';h=((h+11)%12)+1;return `${h}:${String(m).padStart(2,'0')} ${ap}`;}
+const timers = [];
 
-let timers=[];
+function timeToMinutes(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
 
-function addTimer(){
-  const name=nameInput.value,start=startInput.value,end=endInput.value,color=colorInput.value;
-  if(!name||!start||!end)return alert("Missing info");
-  timers.push({name,start,end,color});
+function addTimer() {
+  const name = timerName.value;
+  const start = startTime.value;
+  const end = endTime.value;
+  if (!name || !start || !end) return;
+
+  const timer = {
+    id: Math.random(),
+    name,
+    startMin: timeToMinutes(start),
+    endMin: timeToMinutes(end),
+    agenda: []
+  };
+
+  timers.push(timer);
   render();
 }
 
-function render(){
-  timersDiv.innerHTML='';
-  timers.forEach(t=>{
-    const s=toMin(t.start), e=toMin(t.end);
-    const dur=(e>s)?(e-s):(1440-s+e);
+function render() {
+  const container = document.getElementById('timers');
+  container.innerHTML = '';
 
-    const el=document.createElement('div');
-    el.className='timer';
-    el.innerHTML=`
-      <div class="timer-head">
-        <strong>${t.name}</strong>
-        <div class="meta">${fmt(s)} → ${fmt(e)} (${dur} min)</div>
-      </div>
+  timers.forEach(timer => {
+    const duration =
+      timer.endMin >= timer.startMin
+        ? timer.endMin - timer.startMin
+        : 1440 - timer.startMin + timer.endMin;
 
+    const div = document.createElement('div');
+    div.className = 'timer';
+
+    div.innerHTML = `
+      <strong>${timer.name}</strong>
       <div class="bar-frame">
-        <div class="bar">
-          <div class="bar-fill" style="background:${t.color}"></div>
-        </div>
-        <div class="bar-labels">
-          <span>${fmt(s)}</span>
-          <span>${fmt(e)}</span>
-        </div>
-        <div class="elapsed">0 min (0%) elapsed</div>
+        <div class="bar" id="bar-${timer.id}"></div>
       </div>
+      <button onclick="addAgenda(${timer.id})">Add Agenda Item</button>
     `;
-    t.dom=el;
-    timersDiv.appendChild(el);
+
+    container.appendChild(div);
+    drawAgenda(timer, duration);
   });
 }
 
-function update(){
-  const now=new Date();
-  const nowMin=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
-
-  timers.forEach(t=>{
-    const s=toMin(t.start), e=toMin(t.end);
-    const dur=(e>s)?(e-s):(1440-s+e);
-
-    let elapsed;
-    if(e>s){
-      elapsed=nowMin-s;
-    }else{
-      elapsed=(nowMin>=s)?nowMin-s:(1440-s+nowMin);
-    }
-
-    elapsed=Math.max(0,Math.min(dur,elapsed));
-
-    const pct=(elapsed/dur)*100;
-    t.dom.querySelector('.bar-fill').style.width=pct+'%';
-    t.dom.querySelector('.elapsed').textContent=
-      `${Math.floor(elapsed)} min (${pct.toFixed(1)}%) elapsed`;
+function addAgenda(timerId) {
+  const timer = timers.find(t => t.id === timerId);
+  timer.agenda.push({
+    id: Math.random(),
+    label: 'Agenda',
+    minutes: 10,
+    percent: 0
   });
+  render();
 }
 
-const nameInput=document.getElementById('name');
-const startInput=document.getElementById('start');
-const endInput=document.getElementById('end');
-const colorInput=document.getElementById('color');
-const timersDiv=document.getElementById('timers');
+function drawAgenda(timer, totalMinutes) {
+  const bar = document.getElementById(`bar-${timer.id}`);
+  bar.innerHTML = '';
 
-setInterval(update,1000);
+  timer.agenda.forEach(item => {
+    const el = document.createElement('div');
+    el.className = 'agenda';
+    el.textContent = item.label;
+
+    const widthPct = (item.minutes / totalMinutes) * 100;
+    el.style.width = widthPct + '%';
+    el.style.left = item.percent + '%';
+
+    bar.appendChild(el);
+
+    let dragging = false;
+    let barRect;
+
+    el.onpointerdown = e => {
+      dragging = true;
+      barRect = bar.getBoundingClientRect();
+      el.setPointerCapture(e.pointerId);
+    };
+
+    window.onpointermove = e => {
+      if (!dragging) return;
+
+      let pct = ((e.clientX - barRect.left) / barRect.width) * 100;
+
+      // snap to 1-minute increments
+      const snappedMinutes = Math.round((pct / 100) * totalMinutes);
+      pct = (snappedMinutes / totalMinutes) * 100;
+
+      pct = Math.max(0, Math.min(100 - widthPct, pct));
+      el.style.left = pct + '%';
+      item.percent = pct;
+    };
+
+    window.onpointerup = () => dragging = false;
+  });
+}
 </script>
+
 </body>
 </html>
