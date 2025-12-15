@@ -3,59 +3,63 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Linear Agenda Timer</title>
+<title>Linear Agenda Timer (Stable)</title>
 
 <style>
-:root{
-  --bg:#f6f8fb;
-  --card:#ffffff;
-}
-
 body{
   margin:0;
   padding:24px;
-  background:var(--bg);
-  font-family:system-ui,-apple-system,BlinkMacSystemFont;
+  background:#f6f8fb;
+  font-family:system-ui;
   display:flex;
   justify-content:center;
 }
 
-.wrap{width:100%;max-width:1100px}
+.container{width:100%;max-width:900px}
 
 .card{
-  background:var(--card);
+  background:#fff;
   padding:16px;
   border-radius:14px;
-  box-shadow:0 10px 30px rgba(0,0,0,.08);
+  box-shadow:0 8px 24px rgba(0,0,0,.1);
 }
 
 .controls{
   display:flex;
   gap:8px;
   flex-wrap:wrap;
-  margin-bottom:16px;
+  margin-bottom:12px;
 }
 
 input,button{
   padding:8px 12px;
   border-radius:10px;
   border:1px solid #d1d5db;
-  font-size:14px;
 }
 
 button{
   background:#2563eb;
-  color:white;
+  color:#fff;
   border:none;
   cursor:pointer;
 }
 
 .bar-frame{
   position:relative;
-  height:42px;
+  height:44px;
   background:#e5e7eb;
   border-radius:12px;
   overflow:hidden;
+}
+
+.progress{
+  position:absolute;
+  left:0;
+  top:0;
+  height:100%;
+  background:rgba(0,0,0,.35);
+  width:0%;
+  z-index:1;
 }
 
 .agenda-layer{
@@ -64,32 +68,10 @@ button{
   z-index:2;
 }
 
-.progress{
-  position:absolute;
-  inset:0;
-  width:0%;
-  background:rgba(0,0,0,.35);
-  z-index:3;
-  pointer-events:none;
-}
-
-.bar-text{
-  position:absolute;
-  inset:0;
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  padding:0 14px;
-  font-weight:700;
-  color:white;
-  text-shadow:0 0 3px black;
-  z-index:4;
-}
-
 .agenda-item{
   position:absolute;
   top:6px;
-  height:30px;
+  height:32px;
   border-radius:8px;
   color:white;
   font-size:13px;
@@ -101,43 +83,41 @@ button{
   user-select:none;
 }
 
-.mins{
+.labels{
   display:flex;
   justify-content:space-between;
   margin-top:8px;
-  font-weight:600;
+  font-weight:700;
 }
 </style>
 </head>
 
 <body>
-<div class="wrap">
+<div class="container">
 <div class="card">
 
 <div class="controls">
   <input id="start" type="time">
   <input id="end" type="time">
-  <button onclick="init()">Start Timer</button>
+  <button onclick="startTimer()">Start Timer</button>
 </div>
 
 <div class="bar-frame" id="bar">
-  <div class="agenda-layer" id="agendaLayer"></div>
   <div class="progress" id="progress"></div>
-  <div class="bar-text">
-    <div id="elapsedText">0%</div>
-    <div id="remainText">100%</div>
-  </div>
+  <div class="agenda-layer" id="agendaLayer"></div>
 </div>
 
-<div class="mins">
-  <div id="gone">0 min elapsed</div>
-  <div id="left">0 min remaining</div>
+<div class="labels">
+  <div id="elapsedText">0%</div>
+  <div id="remainingText">100%</div>
 </div>
 
-<div class="controls" style="margin-top:12px">
-  <input id="label" placeholder="Agenda name">
-  <input id="minutes" type="number" placeholder="Minutes">
-  <input id="color" type="color" value="#f97316">
+<hr style="margin:16px 0">
+
+<div class="controls">
+  <input id="agendaLabel" placeholder="Agenda name">
+  <input id="agendaMinutes" type="number" placeholder="Minutes">
+  <input id="agendaColor" type="color" value="#f97316">
   <button onclick="addAgenda()">Add Agenda</button>
 </div>
 
@@ -145,50 +125,50 @@ button{
 </div>
 
 <script>
-let startMin,endMin,total;
+let startMin,endMin,totalMin;
 let agendas=[];
 const bar=document.getElementById('bar');
+const agendaLayer=document.getElementById('agendaLayer');
 
-function toMin(t){
-  const[h,m]=t.split(':').map(Number);
+function toMinutes(t){
+  const [h,m]=t.split(':').map(Number);
   return h*60+m;
 }
 
-function init(){
-  startMin=toMin(start.value);
-  endMin=toMin(end.value);
-  total=endMin-startMin;
-  update();
-  setInterval(update,1000);
+function startTimer(){
+  startMin=toMinutes(start.value);
+  endMin=toMinutes(end.value);
+  totalMin=endMin-startMin;
+  setInterval(updateProgress,1000);
 }
 
 function addAgenda(){
-  const labelVal=document.getElementById('label').value.trim();
-  const minVal=Number(document.getElementById('minutes').value);
-  const colorVal=document.getElementById('color').value;
+  const label=document.getElementById('agendaLabel').value.trim();
+  const mins=Number(document.getElementById('agendaMinutes').value);
+  const color=document.getElementById('agendaColor').value;
 
-  if(!labelVal||!minVal) return;
+  if(!label||!mins||mins<=0) return;
 
   agendas.push({
     id:crypto.randomUUID(),
-    label:labelVal,
-    minutes:minVal,
-    color:colorVal,
-    offset:agendas.reduce((s,a)=>s+a.minutes,0)
+    label,
+    mins,
+    color,
+    offset:agendas.reduce((s,a)=>s+a.mins,0)
   });
 
-  renderAgenda();
+  renderAgendas();
 }
 
-function renderAgenda(){
+function renderAgendas(){
   agendaLayer.innerHTML='';
   agendas.forEach(a=>{
     const el=document.createElement('div');
     el.className='agenda-item';
-    el.textContent=`${a.label} ${a.minutes}m`;
+    el.textContent=a.label;
     el.style.background=a.color;
-    el.style.width=(a.minutes/total*100)+'%';
-    el.style.left=(a.offset/total*100)+'%';
+    el.style.width=(a.mins/totalMin*100)+'%';
+    el.style.left=(a.offset/totalMin*100)+'%';
     makeDraggable(el,a);
     agendaLayer.appendChild(el);
   });
@@ -196,6 +176,7 @@ function renderAgenda(){
 
 function makeDraggable(el,a){
   let startX,startOffset;
+
   el.onpointerdown=e=>{
     startX=e.clientX;
     startOffset=a.offset;
@@ -203,12 +184,13 @@ function makeDraggable(el,a){
 
     document.onpointermove=ev=>{
       const dx=ev.clientX-startX;
-      const minPerPx=total/bar.offsetWidth;
-      let mins=Math.round(startOffset+dx*minPerPx);
-      mins=Math.max(0,Math.min(total-a.minutes,mins));
-      a.offset=mins;
-      snap();
-      renderAgenda();
+      const minsPerPx=totalMin/bar.offsetWidth;
+      let newOffset=Math.round(startOffset+dx*minsPerPx);
+
+      newOffset=Math.max(0,Math.min(totalMin-a.mins,newOffset));
+      a.offset=newOffset;
+      snapAgendas();
+      renderAgendas();
     };
 
     document.onpointerup=()=>{
@@ -217,27 +199,24 @@ function makeDraggable(el,a){
   };
 }
 
-function snap(){
+function snapAgendas(){
   agendas.sort((a,b)=>a.offset-b.offset);
   let cursor=0;
   agendas.forEach(a=>{
     a.offset=cursor;
-    cursor+=a.minutes;
+    cursor+=a.mins;
   });
 }
 
-function update(){
-  if(!total) return;
+function updateProgress(){
   const now=new Date();
   const nowMin=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
-  const elapsed=Math.min(total,Math.max(0,nowMin-startMin));
-  const pct=elapsed/total*100;
+  let elapsed=Math.max(0,Math.min(totalMin,nowMin-startMin));
+  const pct=(elapsed/totalMin)*100;
 
   progress.style.width=pct+'%';
-  elapsedText.textContent=pct.toFixed(1)+'%';
-  remainText.textContent=(100-pct).toFixed(1)+'%';
-  gone.textContent=Math.floor(elapsed)+' min elapsed';
-  left.textContent=Math.ceil(total-elapsed)+' min remaining';
+  elapsedText.textContent=pct.toFixed(1)+'% elapsed';
+  remainingText.textContent=(100-pct).toFixed(1)+'% remaining';
 }
 </script>
 </body>
