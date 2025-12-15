@@ -9,8 +9,9 @@
   body{font-family:Arial;margin:0;padding:20px;background:#f6f8fb}
   .wrap{max-width:1100px;margin:auto}
   .card{background:#fff;padding:14px;border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
-  .controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+  .controls,.agenda-controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10px}
   input,button{padding:8px;border-radius:8px;border:1px solid #ddd}
+  input[type="color"]{padding:0;width:44px;height:36px}
   button{background:#0b66ff;color:#fff;border:0;cursor:pointer}
 
   .timer{margin-top:20px}
@@ -18,7 +19,6 @@
   .bar{height:36px;background:#ddd;border-radius:8px;position:relative;overflow:visible}
   .bar-fill{position:absolute;left:0;top:0;height:100%;background:#3b82f6;border-radius:8px}
 
-  /* START / END LABELS */
   .time-label{
     position:absolute;
     top:50%;
@@ -26,18 +26,17 @@
     font-weight:900;
     font-size:14px;
     color:#fff;
-    pointer-events:none;
     text-shadow:
       -1px -1px 0 #000,
        1px -1px 0 #000,
       -1px  1px 0 #000,
        1px  1px 0 #000;
+    pointer-events:none;
     z-index:5;
   }
   .time-start{left:8px}
   .time-end{right:8px}
 
-  /* AGENDA */
   .agenda-item{
     position:absolute;
     top:-32px;
@@ -85,10 +84,19 @@ function addTimer(){
     end:end.value,
     s:toMin(start.value),
     e:toMin(end.value),
-    agenda:[
-      {label:'Example', dur:10, color:'#f97316', offset:0}
-    ]
+    agenda:[]
   })
+  render()
+}
+
+function addAgenda(tid){
+  const t=timers.find(x=>x.id===tid)
+  const label=document.getElementById(`label-${tid}`).value
+  const dur=Number(document.getElementById(`dur-${tid}`).value)
+  const color=document.getElementById(`color-${tid}`).value
+  if(!label||!dur) return
+
+  t.agenda.push({label,dur,color,offset:0})
   render()
 }
 
@@ -100,11 +108,17 @@ function render(){
     el.className='timer'
     el.innerHTML=`
       <b>${t.name}</b><br><br>
+
+      <div class="agenda-controls">
+        <input id="label-${t.id}" placeholder="Agenda item">
+        <input id="dur-${t.id}" type="number" placeholder="Minutes" style="width:100px">
+        <input id="color-${t.id}" type="color" value="#f97316">
+        <button onclick="addAgenda(${t.id})">Add Agenda</button>
+      </div>
+
       <div class="bar-frame">
         <div class="bar" id="bar-${t.id}">
           <div class="bar-fill" id="fill-${t.id}"></div>
-
-          <!-- START / END LABELS -->
           <div class="time-label time-start">${fmt(t.start)}</div>
           <div class="time-label time-end">${fmt(t.end)}</div>
         </div>
@@ -112,14 +126,13 @@ function render(){
     `
     timersDiv.appendChild(el)
 
-    // agenda items
     const bar=el.querySelector('.bar')
     t.agenda.forEach(a=>{
       const w=(a.dur/dur)*100
       const item=document.createElement('div')
       item.className='agenda-item'
-      item.style.width=`${w}%`
-      item.style.left=`${a.offset}%`
+      item.style.width=w+'%'
+      item.style.left=a.offset+'%'
       item.style.background=a.color
       item.textContent=`${a.label} (${a.dur}m)`
       bar.appendChild(item)
@@ -141,7 +154,6 @@ function update(){
 }
 
 setInterval(update,1000)
-
 const timersDiv=document.getElementById('timers')
 </script>
 </body>
