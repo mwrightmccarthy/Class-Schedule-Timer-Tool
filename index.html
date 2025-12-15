@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>Linear Timer with Agenda</title>
+<title>Linear Timer with Proportional Agenda</title>
 <meta name="viewport" content="width=device-width,initial-scale=1">
 
 <style>
@@ -23,21 +23,24 @@ body{
 input,button{padding:8px 10px;border-radius:8px;border:1px solid #ddd}
 button{background:#2563eb;color:#fff;border:none;cursor:pointer}
 
-.bar-wrapper{position:relative;margin-top:20px}
+.bar-wrapper{position:relative;margin-top:24px}
 .bar{
   height:44px;
   background:#e5e7eb;
   border-radius:12px;
-  overflow:hidden;
   position:relative;
+  overflow:hidden;
 }
 .progress{
   position:absolute;left:0;top:0;height:100%;
   background:#2563eb;width:0%;
+  z-index:1;
 }
 .start-label,.end-label{
-  position:absolute;top:-24px;
-  font-weight:700;font-size:13px;
+  position:absolute;
+  top:-26px;
+  font-weight:700;
+  font-size:13px;
   color:#fff;
   text-shadow:1px 1px 2px #000;
 }
@@ -46,24 +49,42 @@ button{background:#2563eb;color:#fff;border:none;cursor:pointer}
 
 .agenda-track{
   position:absolute;
-  left:0;top:0;height:100%;width:100%;
+  inset:0;
+  z-index:2;
 }
 .agenda-item{
   position:absolute;
-  top:0;height:100%;
-  display:flex;align-items:center;justify-content:center;
-  font-size:12px;font-weight:700;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  font-size:12px;
+  font-weight:700;
   color:#fff;
   border-radius:10px;
   cursor:grab;
   user-select:none;
+  white-space:nowrap;
+  padding:0 8px;
 }
 
-.info{display:flex;justify-content:space-between;margin-top:8px;font-weight:700}
-.now{margin-top:10px;font-size:18px;font-weight:800}
+.info{
+  display:flex;
+  justify-content:space-between;
+  margin-top:10px;
+  font-weight:700;
+}
+.now{
+  margin-top:12px;
+  font-size:18px;
+  font-weight:800;
+}
 
 .agenda-inputs{
-  display:flex;gap:8px;flex-wrap:wrap;margin-top:14px;
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin-top:14px;
 }
 </style>
 </head>
@@ -85,15 +106,18 @@ button{background:#2563eb;color:#fff;border:none;cursor:pointer}
 <script>
 let timer=null;
 
-function mins(t){const[a,b]=t.split(':').map(Number);return a*60+b}
+const toMin=t=>{const[a,b]=t.split(':').map(Number);return a*60+b};
 
 function createTimer(){
+  const s=toMin(start.value);
+  const e=toMin(end.value);
   timer={
     name:name.value,
     start:start.value,
     end:end.value,
-    s:mins(start.value),
-    e:mins(end.value),
+    startMin:s,
+    endMin:e,
+    duration:e-s,
     agenda:[]
   };
   render();
@@ -105,96 +129,103 @@ function addAgenda(){
   const color=aColor.value;
   if(!label||!minutes) return;
 
+  const used=timer.agenda.reduce((s,a)=>s+a.minutes,0);
+  if(used+minutes>timer.duration){
+    alert('Agenda exceeds timer duration');
+    return;
+  }
+
   timer.agenda.push({
-    label,minutes,color,
-    startOffset:totalAgendaMinutes()
+    label,
+    minutes,
+    color,
+    startMinute:used
   });
   aLabel.value='';aMins.value='';
   render();
 }
 
-function totalAgendaMinutes(){
-  return timer.agenda.reduce((s,a)=>s+a.minutes,0);
-}
-
 function render(){
-  const dur=timer.e-timer.s;
+  const d=timer.duration;
   app.innerHTML=`
-  <h3>${timer.name}</h3>
+    <h3>${timer.name}</h3>
 
-  <div class="bar-wrapper">
-    <div class="start-label">${timer.start}</div>
-    <div class="end-label">${timer.end}</div>
+    <div class="bar-wrapper">
+      <div class="start-label">${timer.start}</div>
+      <div class="end-label">${timer.end}</div>
 
-    <div class="bar" id="bar">
-      <div class="agenda-track" id="agenda"></div>
-      <div class="progress" id="progress"></div>
+      <div class="bar" id="bar">
+        <div class="agenda-track" id="agenda"></div>
+        <div class="progress" id="progress"></div>
+      </div>
     </div>
-  </div>
 
-  <div class="info">
-    <div id="elapsed"></div>
-    <div id="remaining"></div>
-  </div>
+    <div class="info">
+      <div id="elapsed"></div>
+      <div id="remaining"></div>
+    </div>
 
-  <div class="now" id="now"></div>
+    <div class="now" id="now"></div>
 
-  <div class="agenda-inputs">
-    <input id="aLabel" placeholder="Agenda item">
-    <input id="aMins" type="number" placeholder="Minutes">
-    <input id="aColor" type="color" value="#16a34a">
-    <button onclick="addAgenda()">Add Agenda</button>
-  </div>
+    <div class="agenda-inputs">
+      <input id="aLabel" placeholder="Agenda item">
+      <input id="aMins" type="number" placeholder="Minutes">
+      <input id="aColor" type="color" value="#16a34a">
+      <button onclick="addAgenda()">Add Agenda</button>
+    </div>
   `;
 
   const track=document.getElementById('agenda');
-  timer.agenda.forEach((a,i)=>{
-    const widthPct=(a.minutes/dur)*100;
-    const leftPct=(a.startOffset/dur)*100;
-
+  timer.agenda.forEach(item=>{
     const div=document.createElement('div');
     div.className='agenda-item';
+    div.textContent=item.label;
+
+    const widthPct=(item.minutes/d)*100;
+    const leftPct=(item.startMinute/d)*100;
+
     div.style.width=widthPct+'%';
     div.style.left=leftPct+'%';
-    div.style.background=a.color;
-    div.textContent=a.label;
-    track.appendChild(div);
+    div.style.background=item.color;
 
-    makeDraggable(div,a,dur);
+    track.appendChild(div);
+    makeDraggable(div,item);
   });
 
   update();
 }
 
-function makeDraggable(el,item,dur){
-  let startX,startLeft;
+function makeDraggable(el,item){
+  let startX,startMin;
 
   el.onpointerdown=e=>{
     startX=e.clientX;
-    startLeft=item.startOffset;
+    startMin=item.startMinute;
     el.setPointerCapture(e.pointerId);
   };
 
   el.onpointermove=e=>{
-    if(e.pressure===0) return;
+    if(!e.buttons) return;
     const bar=document.getElementById('bar');
-    const pxPerMin=bar.clientWidth/dur;
+    const pxPerMin=bar.clientWidth/timer.duration;
     let delta=Math.round((e.clientX-startX)/pxPerMin);
-    let newOffset=Math.max(0,startLeft+delta);
+    let newStart=startMin+delta;
 
-    // snap + prevent overlap
-    const index=timer.agenda.indexOf(item);
-    if(index>0){
-      const prev=timer.agenda[index-1];
-      newOffset=Math.max(newOffset,prev.startOffset+prev.minutes);
+    newStart=Math.max(0,newStart);
+    newStart=Math.min(newStart,timer.duration-item.minutes);
+
+    const idx=timer.agenda.indexOf(item);
+    if(idx>0){
+      const prev=timer.agenda[idx-1];
+      newStart=Math.max(newStart,prev.startMinute+prev.minutes);
     }
-    if(index<timer.agenda.length-1){
-      const next=timer.agenda[index+1];
-      newOffset=Math.min(newOffset,next.startOffset-item.minutes);
+    if(idx<timer.agenda.length-1){
+      const next=timer.agenda[idx+1];
+      newStart=Math.min(newStart,next.startMinute-item.minutes);
     }
 
-    item.startOffset=newOffset;
-    el.style.left=(newOffset/dur)*100+'%';
+    item.startMinute=newStart;
+    el.style.left=(newStart/timer.duration)*100+'%';
   };
 }
 
@@ -202,21 +233,19 @@ function update(){
   if(!timer) return;
   const now=new Date();
   const nowMin=now.getHours()*60+now.getMinutes();
-  const dur=timer.e-timer.s;
-  const elapsed=Math.max(0,Math.min(dur,nowMin-timer.s));
-  const pct=(elapsed/dur)*100;
+  const elapsed=Math.max(0,Math.min(timer.duration,nowMin-timer.startMin));
+  const pct=(elapsed/timer.duration)*100;
 
   progress.style.width=pct+'%';
-  elapsedEl=`${elapsed} min (${pct.toFixed(1)}%)`;
-  document.getElementById('elapsed').textContent=elapsedEl;
-  document.getElementById('remaining').textContent=`${dur-elapsed} min left`;
+  elapsedEl.textContent=`${elapsed} min (${pct.toFixed(1)}%)`;
+  remaining.textContent=`${timer.duration-elapsed} min left`;
 
   let acc=0,current='—';
   for(const a of timer.agenda){
     acc+=a.minutes;
     if(elapsed<=acc){current=a.label;break}
   }
-  document.getElementById('now').textContent=`Now happening: ${current}`;
+  now.textContent=`Now happening: ${current}`;
 }
 
 setInterval(update,1000);
