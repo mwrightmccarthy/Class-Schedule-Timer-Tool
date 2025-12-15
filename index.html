@@ -2,74 +2,73 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Linear Timer – Agenda Snap Test</title>
+<title>Linear Timer – Stacked Agenda</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 
 <style>
-  body {
-    font-family: Arial, sans-serif;
-    background: #f5f7fb;
-    padding: 20px;
-  }
+body {
+  font-family: Arial, sans-serif;
+  background: #f5f7fb;
+  padding: 20px;
+}
 
-  .timer {
-    background: white;
-    padding: 16px;
-    border-radius: 10px;
-    max-width: 900px;
-    margin-bottom: 20px;
-    box-shadow: 0 6px 18px rgba(0,0,0,.08);
-  }
+.timer {
+  background: white;
+  padding: 16px;
+  border-radius: 12px;
+  max-width: 900px;
+  margin-bottom: 24px;
+  box-shadow: 0 6px 18px rgba(0,0,0,.08);
+}
 
-  .bar-frame {
-    position: relative;
-    height: 40px;
-    background: #e5e9f0;
-    border-radius: 10px;
-    margin-top: 16px;
-  }
+.bar-frame {
+  position: relative;
+  height: 44px;
+  background: #e5e9f0;
+  border-radius: 12px;
+  margin-top: 16px;
+  overflow: hidden;
+}
 
-  .bar {
-    position: relative;
-    height: 100%;
-    border-radius: 10px;
-  }
+.bar {
+  position: relative;
+  height: 100%;
+}
 
-  .agenda {
-    position: absolute;
-    top: -34px;
-    height: 28px;
-    border-radius: 6px;
-    background: #ef4444;
-    color: white;
-    font-size: 13px;
-    padding: 4px 8px;
-    cursor: grab;
-    user-select: none;
-    white-space: nowrap;
-  }
+.agenda {
+  position: absolute;
+  top: 6px;
+  height: 32px;
+  border-radius: 8px;
+  font-size: 13px;
+  padding: 6px 10px;
+  cursor: grab;
+  user-select: none;
+  white-space: nowrap;
+  font-weight: 600;
+}
 
-  input, button {
-    padding: 6px 8px;
-    margin-right: 6px;
-    border-radius: 6px;
-    border: 1px solid #ccc;
-  }
+.controls input, .controls button {
+  padding: 6px 8px;
+  margin-right: 6px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
 
-  button {
-    background: #2563eb;
-    color: white;
-    border: none;
-    cursor: pointer;
-  }
+button {
+  background: #2563eb;
+  color: white;
+  border: none;
+  cursor: pointer;
+}
 </style>
 </head>
 
 <body>
 
-<h2>Linear Timer (Agenda Snap Test)</h2>
+<h2>Linear Timer – Stacked Agenda Items</h2>
 
-<div>
+<div class="controls">
   <input id="timerName" placeholder="Timer name">
   <input id="startTime" type="time">
   <input id="endTime" type="time">
@@ -87,21 +86,23 @@ function timeToMinutes(t) {
 }
 
 function addTimer() {
-  const name = timerName.value;
-  const start = startTime.value;
-  const end = endTime.value;
-  if (!name || !start || !end) return;
+  if (!timerName.value || !startTime.value || !endTime.value) return;
 
-  const timer = {
+  timers.push({
     id: Math.random(),
-    name,
-    startMin: timeToMinutes(start),
-    endMin: timeToMinutes(end),
+    name: timerName.value,
+    start: timeToMinutes(startTime.value),
+    end: timeToMinutes(endTime.value),
     agenda: []
-  };
+  });
 
-  timers.push(timer);
   render();
+}
+
+function timerDuration(t) {
+  return t.end >= t.start
+    ? t.end - t.start
+    : 1440 - t.start + t.end;
 }
 
 function render() {
@@ -109,10 +110,7 @@ function render() {
   container.innerHTML = '';
 
   timers.forEach(timer => {
-    const duration =
-      timer.endMin >= timer.startMin
-        ? timer.endMin - timer.startMin
-        : 1440 - timer.startMin + timer.endMin;
+    const dur = timerDuration(timer);
 
     const div = document.createElement('div');
     div.className = 'timer';
@@ -122,64 +120,95 @@ function render() {
       <div class="bar-frame">
         <div class="bar" id="bar-${timer.id}"></div>
       </div>
-      <button onclick="addAgenda(${timer.id})">Add Agenda Item</button>
+
+      <div style="margin-top:12px">
+        <input placeholder="Label" id="lbl-${timer.id}">
+        <input type="number" placeholder="Minutes" id="min-${timer.id}" style="width:90px">
+        <input type="color" id="bg-${timer.id}" value="#ef4444">
+        <input type="color" id="fg-${timer.id}" value="#ffffff">
+        <button onclick="addAgenda(${timer.id})">Add Agenda</button>
+      </div>
     `;
 
     container.appendChild(div);
-    drawAgenda(timer, duration);
+    renderAgenda(timer, dur);
   });
 }
 
 function addAgenda(timerId) {
   const timer = timers.find(t => t.id === timerId);
+  const label = document.getElementById(`lbl-${timerId}`).value;
+  const minutes = Number(document.getElementById(`min-${timerId}`).value);
+  const bg = document.getElementById(`bg-${timerId}`).value;
+  const fg = document.getElementById(`fg-${timerId}`).value;
+
+  if (!label || !minutes) return;
+
   timer.agenda.push({
     id: Math.random(),
-    label: 'Agenda',
-    minutes: 10,
-    percent: 0
+    label,
+    minutes,
+    bg,
+    fg
   });
+
   render();
 }
 
-function drawAgenda(timer, totalMinutes) {
+function renderAgenda(timer, totalMinutes) {
   const bar = document.getElementById(`bar-${timer.id}`);
   bar.innerHTML = '';
 
-  timer.agenda.forEach(item => {
+  let currentMinute = 0;
+
+  timer.agenda.forEach((item, index) => {
+    const widthPct = (item.minutes / totalMinutes) * 100;
+    const leftPct = (currentMinute / totalMinutes) * 100;
+    currentMinute += item.minutes;
+
     const el = document.createElement('div');
     el.className = 'agenda';
     el.textContent = item.label;
-
-    const widthPct = (item.minutes / totalMinutes) * 100;
     el.style.width = widthPct + '%';
-    el.style.left = item.percent + '%';
+    el.style.left = leftPct + '%';
+    el.style.background = item.bg;
+    el.style.color = item.fg;
 
     bar.appendChild(el);
 
     let dragging = false;
-    let barRect;
 
     el.onpointerdown = e => {
       dragging = true;
-      barRect = bar.getBoundingClientRect();
       el.setPointerCapture(e.pointerId);
     };
 
-    window.onpointermove = e => {
-      if (!dragging) return;
-
-      let pct = ((e.clientX - barRect.left) / barRect.width) * 100;
-
-      // snap to 1-minute increments
-      const snappedMinutes = Math.round((pct / 100) * totalMinutes);
-      pct = (snappedMinutes / totalMinutes) * 100;
-
-      pct = Math.max(0, Math.min(100 - widthPct, pct));
-      el.style.left = pct + '%';
-      item.percent = pct;
+    el.onpointerup = e => {
+      dragging = false;
+      el.releasePointerCapture(e.pointerId);
     };
 
-    window.onpointerup = () => dragging = false;
+    el.onpointermove = e => {
+      if (!dragging) return;
+
+      const rect = bar.getBoundingClientRect();
+      let pct = ((e.clientX - rect.left) / rect.width) * 100;
+      pct = Math.max(0, Math.min(100, pct));
+
+      // snap to minute
+      const snapMin = Math.round((pct / 100) * totalMinutes);
+
+      // reorder agenda based on snapped position
+      const newIndex = Math.min(
+        timer.agenda.length - 1,
+        Math.floor(snapMin / item.minutes)
+      );
+
+      timer.agenda.splice(index, 1);
+      timer.agenda.splice(newIndex, 0, item);
+
+      render();
+    };
   });
 }
 </script>
