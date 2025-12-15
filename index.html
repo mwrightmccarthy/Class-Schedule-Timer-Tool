@@ -7,26 +7,26 @@
 
 <style>
 body {
-  font-family: Arial, sans-serif;
-  background: #f5f7fb;
+  font-family: system-ui, Arial, sans-serif;
+  background: #f6f8fb;
   padding: 20px;
 }
 
 .timer {
-  background: white;
+  background: #fff;
   padding: 16px;
-  border-radius: 12px;
+  border-radius: 14px;
   max-width: 900px;
   margin-bottom: 24px;
-  box-shadow: 0 6px 18px rgba(0,0,0,.08);
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
 }
 
 .bar-frame {
   position: relative;
-  height: 44px;
+  height: 48px;
   background: #e5e9f0;
-  border-radius: 12px;
-  margin-top: 16px;
+  border-radius: 14px;
+  margin-top: 14px;
   overflow: hidden;
 }
 
@@ -38,26 +38,26 @@ body {
 .agenda {
   position: absolute;
   top: 6px;
-  height: 32px;
-  border-radius: 8px;
+  height: 36px;
+  border-radius: 10px;
   font-size: 13px;
-  padding: 6px 10px;
+  padding: 8px 12px;
+  font-weight: 600;
   cursor: grab;
   user-select: none;
   white-space: nowrap;
-  font-weight: 600;
 }
 
 .controls input, .controls button {
-  padding: 6px 8px;
+  padding: 8px 10px;
   margin-right: 6px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
+  border-radius: 8px;
+  border: 1px solid #d0d7e2;
 }
 
 button {
   background: #2563eb;
-  color: white;
+  color: #fff;
   border: none;
   cursor: pointer;
 }
@@ -66,7 +66,7 @@ button {
 
 <body>
 
-<h2>Linear Timer – Stacked Agenda Items</h2>
+<h2>Linear Timer (Stacked Agenda – No Overlap)</h2>
 
 <div class="controls">
   <input id="timerName" placeholder="Timer name">
@@ -85,11 +85,17 @@ function timeToMinutes(t) {
   return h * 60 + m;
 }
 
+function duration(t) {
+  return t.end >= t.start
+    ? t.end - t.start
+    : 1440 - t.start + t.end;
+}
+
 function addTimer() {
   if (!timerName.value || !startTime.value || !endTime.value) return;
 
   timers.push({
-    id: Math.random(),
+    id: crypto.randomUUID(),
     name: timerName.value,
     start: timeToMinutes(startTime.value),
     end: timeToMinutes(endTime.value),
@@ -99,18 +105,12 @@ function addTimer() {
   render();
 }
 
-function timerDuration(t) {
-  return t.end >= t.start
-    ? t.end - t.start
-    : 1440 - t.start + t.end;
-}
-
 function render() {
   const container = document.getElementById('timers');
   container.innerHTML = '';
 
   timers.forEach(timer => {
-    const dur = timerDuration(timer);
+    const dur = duration(timer);
 
     const div = document.createElement('div');
     div.className = 'timer';
@@ -122,11 +122,11 @@ function render() {
       </div>
 
       <div style="margin-top:12px">
-        <input placeholder="Label" id="lbl-${timer.id}">
+        <input placeholder="Agenda label" id="lbl-${timer.id}">
         <input type="number" placeholder="Minutes" id="min-${timer.id}" style="width:90px">
         <input type="color" id="bg-${timer.id}" value="#ef4444">
         <input type="color" id="fg-${timer.id}" value="#ffffff">
-        <button onclick="addAgenda(${timer.id})">Add Agenda</button>
+        <button onclick="addAgenda('${timer.id}')">Add Agenda</button>
       </div>
     `;
 
@@ -145,7 +145,7 @@ function addAgenda(timerId) {
   if (!label || !minutes) return;
 
   timer.agenda.push({
-    id: Math.random(),
+    id: crypto.randomUUID(),
     label,
     minutes,
     bg,
@@ -159,16 +159,16 @@ function renderAgenda(timer, totalMinutes) {
   const bar = document.getElementById(`bar-${timer.id}`);
   bar.innerHTML = '';
 
-  let currentMinute = 0;
+  let cursor = 0;
 
   timer.agenda.forEach((item, index) => {
     const widthPct = (item.minutes / totalMinutes) * 100;
-    const leftPct = (currentMinute / totalMinutes) * 100;
-    currentMinute += item.minutes;
+    const leftPct = (cursor / totalMinutes) * 100;
+    cursor += item.minutes;
 
     const el = document.createElement('div');
     el.className = 'agenda';
-    el.textContent = item.label;
+    el.textContent = `${item.label} (${item.minutes}m)`;
     el.style.width = widthPct + '%';
     el.style.left = leftPct + '%';
     el.style.background = item.bg;
@@ -192,17 +192,20 @@ function renderAgenda(timer, totalMinutes) {
       if (!dragging) return;
 
       const rect = bar.getBoundingClientRect();
-      let pct = ((e.clientX - rect.left) / rect.width) * 100;
-      pct = Math.max(0, Math.min(100, pct));
+      let pct = (e.clientX - rect.left) / rect.width;
+      pct = Math.max(0, Math.min(1, pct));
 
-      // snap to minute
-      const snapMin = Math.round((pct / 100) * totalMinutes);
+      // snap to 1-minute increments
+      const targetMinute = Math.round(pct * totalMinutes);
 
-      // reorder agenda based on snapped position
-      const newIndex = Math.min(
-        timer.agenda.length - 1,
-        Math.floor(snapMin / item.minutes)
-      );
+      let running = 0;
+      let newIndex = 0;
+
+      for (let i = 0; i < timer.agenda.length; i++) {
+        if (running >= targetMinute) break;
+        running += timer.agenda[i].minutes;
+        newIndex = i + 1;
+      }
 
       timer.agenda.splice(index, 1);
       timer.agenda.splice(newIndex, 0, item);
