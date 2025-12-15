@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Linear Timer – Stacked Agenda</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<style>
+body {
+  font-family: system-ui, Arial, sans-serif;
+  background: #f6f8fb;
+  padding: 20px;
+}
+
+.timer {
+  background: #fff;
+  padding: 16px;
+  border-radius: 14px;
+  max-width: 900px;
+  margin-bottom: 24px;
+  box-shadow: 0 8px 24px rgba(0,0,0,.08);
+}
+
+.bar-frame {
+  position: relative;
+  height: 48px;
+  background: #e5e9f0;
+  border-radius: 14px;
+  margin-top: 10px;
+  overflow: hidden;
+}
+
+.bar {
+  position: relative;
+  height: 100%;
+}
+
+.start-label, .end-label {
+  position: absolute;
+  top: -22px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.end-label { right: 0; }
+
+.agenda {
+  position: absolute;
+  top: 6px;
+  height: 36px;
+  border-radius: 10px;
+  font-size: 13px;
+  padding: 8px 12px;
+  font-weight: 600;
+  cursor: grab;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.controls input, .controls button {
+  padding: 8px 10px;
+  margin-right: 6px;
+  border-radius: 8px;
+  border: 1px solid #d0d7e2;
+}
+
+button {
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  cursor: pointer;
+}
+</style>
+</head>
+
+<body>
+
+<h2>Linear Timer (Stacked Agenda – No Overlap)</h2>
+
+<div class="controls">
+  <input id="timerName" placeholder="Timer name">
+  <input id="startTime" type="time">
+  <input id="endTime" type="time">
+  <button onclick="addTimer()">Add Timer</button>
+</div>
+
+<div id="timers"></div>
+
+<script>
+const timers = [];
+
+function timeToMinutes(t) {
+  const [h, m] = t.split(':').map(Number);
+  return h * 60 + m;
+}
+
+function minutesToLabel(min) {
+  const h = Math.floor(min / 60) % 24;
+  const m = min % 60;
+  const am = h < 12;
+  const hh = ((h + 11) % 12) + 1;
+  return `${hh}:${String(m).padStart(2,'0')} ${am ? 'AM' : 'PM'}`;
+}
+
+function duration(t) {
+  return t.end >= t.start
+    ? t.end - t.start
+    : 1440 - t.start + t.end;
+}
+
+function addTimer() {
+  if (!timerName.value || !startTime.value || !endTime.value) return;
+
+  timers.push({
+    id: crypto.randomUUID(),
+    name: timerName.value,
+    start: timeToMinutes(startTime.value),
+    end: timeToMinutes(endTime.value),
+    agenda: []
+  });
+
+  render();
+}
+
+function render() {
+  const container = document.getElementById('timers');
+  container.innerHTML = '';
+
+  timers.forEach(timer => {
+    const dur = duration(timer);
+
+    const div = document.createElement('div');
+    div.className = 'timer';
+
+    div.innerHTML = `
+      <strong>${timer.name}</strong>
+      <div class="bar-frame">
+        <div class="start-label">${minutesToLabel(timer.start)}</div>
+        <div class="end-label">${minutesToLabel(timer.end)}</div>
+        <div class="bar" id="bar-${timer.id}"></div>
+      </div>
+
+      <div style="margin-top:12px">
+        <input placeholder="Agenda label" id="lbl-${timer.id}">
+        <input type="number" placeholder="Minutes" id="min-${timer.id}" style="width:90px">
+        <input type="color" id="bg-${timer.id}" value="#ef4444">
+        <input type="color" id="fg-${timer.id}" value="#ffffff">
+        <button onclick="addAgenda('${timer.id}')">Add Agenda</button>
+      </div>
+    `;
+
+    container.appendChild(div);
+    renderAgenda(timer, dur);
+  });
+}
+
+function addAgenda(timerId) {
+  const timer = timers.find(t => t.id === timerId);
+  const label = document.getElementById(`lbl-${timerId}`).value;
+  const minutes = Number(document.getElementById(`min-${timerId}`).value);
+  const bg = document.getElementById(`bg-${timerId}`).value;
+  const fg = document.getElementById(`fg-${timerId}`).value;
+
+  if (!label || !minutes) return;
+
+  timer.agenda.push({
+    id: crypto.randomUUID(),
+    label,
+    minutes,
+    bg,
+    fg
+  });
+
+  render();
+}
+
+function renderAgenda(timer, totalMinutes) {
+  const bar = document.getElementById(`bar-${timer.id}`);
+  bar.innerHTML = '';
+
+  let cursor = 0;
+
+  timer.agenda.forEach((item, index) => {
+    const widthPct = (item.minutes / totalMinutes) * 100;
+    const leftPct = (cursor / totalMinutes) * 100;
+    cursor += item.minutes;
+
+    const el = document.createElement('div');
+    el.className = 'agenda';
+    el.textContent = `${item.label} (${item.minutes}m)`;
+    el.style.width = widthPct + '%';
+    el.style.left = leftPct + '%';
+    el.style.background = item.bg;
+    el.style.color = item.fg;
+
+    bar.appendChild(el);
+
+    let dragging = false;
+
+    el.onpointerdown = e => {
+      dragging = true;
+      el.setPointerCapture(e.pointerId);
+    };
+
+    el.onpointerup = e => {
+      dragging = false;
+      el.releasePointerCapture(e.pointerId);
+    };
+
+    el.onpointermove = e => {
+      if (!dragging) return;
+
+      const rect = bar.getBoundingClientRect();
+      let pct = (e.clientX - rect.left) / rect.width;
+      pct = Math.max(0, Math.min(1, pct));
+
+      const targetMinute = Math.round(pct * totalMinutes);
+
+      let running = 0;
+      let newIndex = 0;
+
+      for (let i = 0; i < timer.agenda.length; i++) {
+        if (running >= targetMinute) break;
+        running += timer.agenda[i].minutes;
+        newIndex = i + 1;
+      }
+
+      timer.agenda.splice(index, 1);
+      timer.agenda.splice(newIndex, 0, item);
+
+      render();
+    };
+  });
+}
+</script>
+
+</body>
+</html>
