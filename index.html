@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Linear Agenda Timer (Stable)</title>
+<title>LINEAR CLASSROOM TIMER!</title>
 
 <style>
 body{
@@ -11,37 +11,33 @@ body{
   padding:24px;
   background:#f6f8fb;
   font-family:system-ui;
-  display:flex;
-  justify-content:center;
 }
-
-.container{width:100%;max-width:900px}
-
+.container{max-width:1400px;margin:auto}
 .card{
   background:#fff;
   padding:16px;
   border-radius:14px;
   box-shadow:0 8px 24px rgba(0,0,0,.1);
+  margin-bottom:20px;
 }
-
-.controls{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-  margin-bottom:12px;
-}
-
+.controls{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 input,button{
   padding:8px 12px;
   border-radius:10px;
   border:1px solid #d1d5db;
 }
-
 button{
   background:#2563eb;
   color:#fff;
   border:none;
   cursor:pointer;
+}
+
+.timer-card{
+  border:1px solid #e5e7eb;
+  border-radius:14px;
+  padding:14px;
+  margin-top:16px;
 }
 
 .bar-frame{
@@ -52,20 +48,19 @@ button{
   overflow:hidden;
 }
 
-.progress{
-  position:absolute;
-  left:0;
-  top:0;
-  height:100%;
-  background:rgba(0,0,0,.35);
-  width:0%;
-  z-index:1;
-}
-
 .agenda-layer{
   position:absolute;
   inset:0;
   z-index:2;
+}
+
+.progress{
+  position:absolute;
+  inset:0;
+  width:0%;
+  background:rgba(0,0,0,.35);
+  z-index:3;
+  pointer-events:none;
 }
 
 .agenda-item{
@@ -73,7 +68,7 @@ button{
   top:6px;
   height:32px;
   border-radius:8px;
-  color:white;
+  color:#fff;
   font-size:13px;
   font-weight:700;
   display:flex;
@@ -86,8 +81,48 @@ button{
 .labels{
   display:flex;
   justify-content:space-between;
-  margin-top:8px;
+  margin-top:6px;
   font-weight:700;
+}
+
+.now{
+  margin-top:10px;
+  padding:8px 12px;
+  border-radius:10px;
+  font-weight:800;
+  color:#fff;
+  background:#111827;
+}
+
+/* PROJECTOR */
+.projector{
+  background:#0f172a;
+  color:#fff;
+  padding:48px;
+  min-height:100vh;
+}
+.projector h1{font-size:64px;margin-bottom:28px}
+.projector .bar-frame{height:90px;margin-bottom:12px}
+.projector .progress{background:rgba(255,255,255,.35)}
+.projector .agenda-item{
+  top:12px;
+  height:66px;
+  font-size:28px;
+}
+.projector .labels{font-size:28px}
+.projector .now-projector{
+  margin-top:30px;
+  font-size:40px;
+  font-weight:900;
+}
+.projector .agenda-title{
+  margin-top:18px;
+  font-size:36px;
+  font-weight:800;
+}
+.projector .agenda-progress{
+  position:absolute;
+  inset:0;
 }
 </style>
 </head>
@@ -96,127 +131,243 @@ button{
 <div class="container">
 <div class="card">
 
+<h2>Create a new timer for each class period. Add class agenda items with time limits. Drag to reorder. Projector mode displsays the timer and current agenda. Be intentional with your time!</h2>
 <div class="controls">
-  <input id="start" type="time">
-  <input id="end" type="time">
-  <button onclick="startTimer()">Start Timer</button>
+  <input id="timerName" placeholder="Timer name">
+  <input id="timerStart" type="time">
+  <input id="timerEnd" type="time">
+  <button onclick="addTimer()">Add Timer</button>
+  <button onclick="saveAll()">Save</button>
+  <button onclick="clearAll()">Clear</button>
 </div>
 
-<div class="bar-frame" id="bar">
-  <div class="progress" id="progress"></div>
-  <div class="agenda-layer" id="agendaLayer"></div>
-</div>
-
-<div class="labels">
-  <div id="elapsedText">0%</div>
-  <div id="remainingText">100%</div>
-</div>
-
-<hr style="margin:16px 0">
-
-<div class="controls">
-  <input id="agendaLabel" placeholder="Agenda name">
-  <input id="agendaMinutes" type="number" placeholder="Minutes">
-  <input id="agendaColor" type="color" value="#f97316">
-  <button onclick="addAgenda()">Add Agenda</button>
-</div>
+<div id="timers"></div>
 
 </div>
 </div>
 
 <script>
-let startMin,endMin,totalMin;
-let agendas=[];
-const bar=document.getElementById('bar');
-const agendaLayer=document.getElementById('agendaLayer');
+/* ===== CORE (STABLE) ===== */
 
-function toMinutes(t){
+let timers=[];
+const timersEl=document.getElementById('timers');
+
+function toMin(t){
   const [h,m]=t.split(':').map(Number);
   return h*60+m;
 }
 
-function startTimer(){
-  startMin=toMinutes(start.value);
-  endMin=toMinutes(end.value);
-  totalMin=endMin-startMin;
-  setInterval(updateProgress,1000);
-}
-
-function addAgenda(){
-  const label=document.getElementById('agendaLabel').value.trim();
-  const mins=Number(document.getElementById('agendaMinutes').value);
-  const color=document.getElementById('agendaColor').value;
-
-  if(!label||!mins||mins<=0) return;
-
-  agendas.push({
+function addTimer(){
+  if(!timerName.value||!timerStart.value||!timerEnd.value) return;
+  timers.push({
     id:crypto.randomUUID(),
-    label,
-    mins,
-    color,
-    offset:agendas.reduce((s,a)=>s+a.mins,0)
+    name:timerName.value,
+    start:timerStart.value,
+    end:timerEnd.value,
+    agendas:[]
   });
-
-  renderAgendas();
+  render();
 }
 
-function renderAgendas(){
-  agendaLayer.innerHTML='';
-  agendas.forEach(a=>{
+function render(){
+  timersEl.innerHTML='';
+  timers.forEach(renderTimer);
+}
+
+function renderTimer(t){
+  const startM=toMin(t.start);
+  const endM=toMin(t.end);
+  const total=endM-startM;
+
+  const card=document.createElement('div');
+  card.className='timer-card';
+
+  card.innerHTML=`
+    <h3>${t.name} (${t.start}–${t.end})</h3>
+    <div class="bar-frame">
+      <div class="agenda-layer"></div>
+      <div class="progress"></div>
+    </div>
+    <div class="labels">
+      <div class="elapsed"></div>
+      <div class="remaining"></div>
+    </div>
+    <div class="now">Now Happening — None</div>
+    <div class="controls" style="margin-top:10px">
+      <input placeholder="Agenda name">
+      <input type="number" placeholder="Minutes">
+      <input type="color" value="#f97316">
+      <button>Add Agenda</button>
+      <button>Projector Mode</button>
+    </div>
+  `;
+
+  timersEl.appendChild(card);
+
+  const agendaLayer=card.querySelector('.agenda-layer');
+  const progress=card.querySelector('.progress');
+  const elapsedEl=card.querySelector('.elapsed');
+  const remainingEl=card.querySelector('.remaining');
+  const nowEl=card.querySelector('.now');
+  const btns=card.querySelectorAll('button');
+
+  btns[0].onclick=()=>{
+    const i=card.querySelectorAll('input');
+    t.agendas.push({
+      label:i[0].value,
+      mins:+i[1].value,
+      color:i[2].value,
+      offset:t.agendas.reduce((s,a)=>s+a.mins,0)
+    });
+    render();
+  };
+
+  btns[1].onclick=()=>{
+    localStorage.setItem('projectorTimer',JSON.stringify(t));
+    window.open(location.pathname+'#projector','_blank');
+  };
+
+  function drawAgendas(){
+    agendaLayer.innerHTML='';
+    t.agendas.forEach(a=>{
+      const el=document.createElement('div');
+      el.className='agenda-item';
+      el.textContent=a.label;
+      el.style.background=a.color;
+      el.style.width=(a.mins/total*100)+'%';
+      el.style.left=(a.offset/total*100)+'%';
+      agendaLayer.appendChild(el);
+      enableDrag(el,a);
+    });
+  }
+
+  function enableDrag(el,a){
+    let sx,so;
+    el.onpointerdown=e=>{
+      sx=e.clientX; so=a.offset;
+      el.setPointerCapture(e.pointerId);
+      el.onpointermove=ev=>{
+        a.offset=Math.max(0,Math.min(total-a.mins, so+(ev.clientX-sx)*(total/card.offsetWidth)));
+        el.style.left=(a.offset/total*100)+'%';
+      };
+      el.onpointerup=()=>{
+        el.onpointermove=null;
+        snap();
+        render();
+      };
+    };
+  }
+
+  function snap(){
+    t.agendas.sort((a,b)=>a.offset-b.offset);
+    let c=0;
+    t.agendas.forEach(a=>{a.offset=c;c+=a.mins});
+  }
+
+  function tick(){
+    const n=new Date();
+    const nowM=n.getHours()*60+n.getMinutes()+n.getSeconds()/60;
+    const e=Math.max(0,Math.min(total,nowM-startM));
+    progress.style.width=(e/total*100)+'%';
+    elapsedEl.textContent=e.toFixed(1)+' min elapsed';
+    remainingEl.textContent=(total-e).toFixed(1)+' min remaining';
+    const cur=t.agendas.find(a=>e>=a.offset&&e<a.offset+a.mins);
+    nowEl.textContent=cur?'Now Happening — '+cur.label:'Now Happening — None';
+    nowEl.style.background=cur?cur.color:'#111827';
+  }
+
+  drawAgendas();
+  tick();
+  setInterval(tick,1000);
+}
+
+function saveAll(){
+  localStorage.setItem('multiAgendaTimers',JSON.stringify(timers));
+}
+function clearAll(){
+  localStorage.clear();
+  location.reload();
+}
+function load(){
+  const d=localStorage.getItem('multiAgendaTimers');
+  if(d){timers=JSON.parse(d);render();}
+}
+
+/* ===== PROJECTOR (READ-ONLY, VISUAL MATCH) ===== */
+
+if(location.hash==='#projector'){
+  document.body.innerHTML='';
+  const t=JSON.parse(localStorage.getItem('projectorTimer'));
+  const startM=toMin(t.start);
+  const endM=toMin(t.end);
+  const total=endM-startM;
+
+  const p=document.createElement('div');
+  p.className='projector';
+  p.innerHTML=`
+    <h1>${t.name}</h1>
+
+    <div class="bar-frame">
+      <div class="agenda-layer" id="pAgenda"></div>
+      <div class="progress" id="pProgress"></div>
+    </div>
+    <div class="labels">
+      <div></div>
+      <div id="pRemain"></div>
+    </div>
+
+    <div class="now-projector" id="nowText">NOW HAPPENING —</div>
+
+    <div id="agendaBlock" style="display:none">
+      <div class="agenda-title" id="agendaTitle"></div>
+      <div class="bar-frame">
+        <div class="agenda-progress" id="agendaProgress"></div>
+      </div>
+      <div class="labels">
+        <div></div>
+        <div id="agendaRemain"></div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(p);
+
+  // draw agenda segments in main projector bar
+  t.agendas.forEach(a=>{
     const el=document.createElement('div');
     el.className='agenda-item';
     el.textContent=a.label;
     el.style.background=a.color;
-    el.style.width=(a.mins/totalMin*100)+'%';
-    el.style.left=(a.offset/totalMin*100)+'%';
-    makeDraggable(el,a);
-    agendaLayer.appendChild(el);
+    el.style.width=(a.mins/total*100)+'%';
+    el.style.left=(a.offset/total*100)+'%';
+    pAgenda.appendChild(el);
   });
-}
 
-function makeDraggable(el,a){
-  let startX,startOffset;
+  setInterval(()=>{
+    const n=new Date();
+    const nowM=n.getHours()*60+n.getMinutes()+n.getSeconds()/60;
+    const e=Math.max(0,Math.min(total,nowM-startM));
 
-  el.onpointerdown=e=>{
-    startX=e.clientX;
-    startOffset=a.offset;
-    el.setPointerCapture(e.pointerId);
+    pProgress.style.width=(e/total*100)+'%';
+    pRemain.textContent=(total-e).toFixed(1)+' min remaining';
 
-    document.onpointermove=ev=>{
-      const dx=ev.clientX-startX;
-      const minsPerPx=totalMin/bar.offsetWidth;
-      let newOffset=Math.round(startOffset+dx*minsPerPx);
+    const cur=t.agendas.find(a=>e>=a.offset&&e<a.offset+a.mins);
 
-      newOffset=Math.max(0,Math.min(totalMin-a.mins,newOffset));
-      a.offset=newOffset;
-      snapAgendas();
-      renderAgendas();
-    };
+    if(cur){
+      nowText.textContent='NOW HAPPENING — '+cur.label;
+      agendaBlock.style.display='block';
+      agendaTitle.textContent=cur.label;
+      const ae=e-cur.offset;
+      agendaProgress.style.width=(ae/cur.mins*100)+'%';
+      agendaProgress.style.background=cur.color;
+      agendaRemain.textContent=(cur.mins-ae).toFixed(1)+' min remaining';
+    }else{
+      nowText.textContent='NOW HAPPENING —';
+      agendaBlock.style.display='none';
+    }
+  },1000);
 
-    document.onpointerup=()=>{
-      document.onpointermove=null;
-    };
-  };
-}
-
-function snapAgendas(){
-  agendas.sort((a,b)=>a.offset-b.offset);
-  let cursor=0;
-  agendas.forEach(a=>{
-    a.offset=cursor;
-    cursor+=a.mins;
-  });
-}
-
-function updateProgress(){
-  const now=new Date();
-  const nowMin=now.getHours()*60+now.getMinutes()+now.getSeconds()/60;
-  let elapsed=Math.max(0,Math.min(totalMin,nowMin-startMin));
-  const pct=(elapsed/totalMin)*100;
-
-  progress.style.width=pct+'%';
-  elapsedText.textContent=pct.toFixed(1)+'% elapsed';
-  remainingText.textContent=(100-pct).toFixed(1)+'% remaining';
+}else{
+  load();
 }
 </script>
 </body>
